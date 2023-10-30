@@ -14,6 +14,9 @@ device = torch.device('cpu')
 local_file = 'model.pt'
 model = torch.package.PackageImporter(local_file).load_pickle("tts_models", "model")
 model.to(device)
+if not os.path.isfile(local_file):
+    torch.hub.download_url_to_file('https://models.silero.ai/models/tts/ru/v4_ru.pt',
+                                   local_file)  
 
 commands_dict = {
     'commands': {
