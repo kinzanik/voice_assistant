@@ -1,7 +1,7 @@
 import speech_recognition
 import sys
 import random as r
-from PyQt5 import uic  # Импортируем uic
+from PyQt5 import uic
 from PyQt5.QtWidgets import QApplication, QMainWindow
 import os
 import torch
@@ -10,6 +10,8 @@ from pydub.playback import play
 import webbrowser as wb
 import subprocess as sb
 from time import sleep
+from sound import Sound
+import re
 
 device = torch.device('cpu')
 local_file = 'model.pt'
@@ -18,6 +20,26 @@ model.to(device)
 if not os.path.isfile(local_file):
     torch.hub.download_url_to_file('https://models.silero.ai/models/tts/ru/v4_ru.pt',
                                    local_file)
+
+
+def except_hook(cls, exception, traceback):
+    sys.__excepthook__(cls, exception, traceback)
+
+
+def play_sound(path: str, klv):
+    file = path
+    if klv is None:
+        file += '.wav'
+        return
+    klv = int(klv)
+    if klv == 0:
+        file += '0' + '.wav'
+    else:
+        rand = str(r.randint(0, klv - 1))
+        file += rand + '.wav'
+    audio = AudioSegment.from_file(file, format="wav")
+    play(audio)
+
 
 commands_dict = {
     'commands': {
@@ -36,7 +58,11 @@ commands_dict = {
                    'запиши в список дел', 'запиши список дел', 'пополни список дел', 'пополнить список дел',
                    'дополни список дел'],
         'r_todo': ['прочти список дел', 'сделай'],
-        'clear_todo': ['очисти список дел', 'очистить список дел']
+        'clear_todo': ['очисти список дел', 'очистить список дел', 'включи список дел'],
+        'vol_up': ['прибавь громкость', 'прибавь звук', 'увеличь громкость', 'прибавь громкость',
+                   'увеличить громкость', 'поставь громкость', 'уменьши громкость', 'поставь звук',
+                   'уменьшить громкость'],
+        'vol_off': ['выключи звук', 'выключить звук']
     }
 }
 
@@ -53,16 +79,13 @@ def record_and_recognize_audio(*args: tuple, do='default'):
         try:
             if do == 'default':
                 print('Слушаю...')
-                audio = AudioSegment.from_file(f"./wating/wating1.wav", format="wav")
+                play_sound('./wating/wating', 0)
             elif do == 'youtube_search':
                 print('Что будем искать?')
-                rand = str(r.randint(0, 2))
-                audio = AudioSegment.from_file(f"./youtube_search/youtube_search{rand}.wav", format="wav")
+                play_sound('./youtube_search/youtube_search', 3)
             elif do == 'w_todo':
                 print('Что запишем в список дел?')
-                rand = str(r.randint(0, 1))
-                audio = AudioSegment.from_file(f'./todo_list/todo_wait{rand}.wav')
-            play(audio)
+                play_sound('./todo_list/todo_wait', 2)
             audio = recognizer.listen(microphone, 3, 5)
 
         except speech_recognition.WaitTimeoutError:
@@ -104,10 +127,7 @@ class Speaker:
 
 
 def greeting():
-    rand = str(r.randint(0, 4))
-    file = f'./greeting/greeting{rand}.wav'
-    audio = AudioSegment.from_file(file, format="wav")
-    play(audio)
+    play_sound('./greeting/greeting', 4)
 
 
 def open_youtube():
@@ -161,29 +181,41 @@ def w_todo():
     w_str = record_and_recognize_audio(do='w_todo')
     a.write(w_str + '\n')
     a.close()
-
+    print('Добавлено!')
 
 
 def r_todo():
     a = open('todo.txt', 'r', encoding='utf-8').readlines()
     if len(a) == 0:
         sleep(2)
-        rand = str(r.randint(0, 2))
-        file = f'./todo_list/todo_error{rand}.wav'
-        audio = AudioSegment.from_file(file, format="wav")
-        play(audio)
+        play_sound('./todo_list/todo_error', 3)
         return
-    a = '. '.join(a)
+    a = '. '.join(a) + '.'
     speaker = Speaker()
     speaker.text_to_spreach(a)
-    file = f'test.wav'
-    audio = AudioSegment.from_file(file, format="wav")
-    play(audio)
+    play_sound('test.wav', None)
 
 
 def clear_todo():
     todo = open('todo.txt', 'w', encoding='utf-8')
     todo.close()
+
+
+def vol_set(vi):
+    match = re.search(r'\d+', vi)
+    sound = Sound()
+    if match:
+        vol = int(match.group())  # Преобразование найденного числа в int
+        vol = 100 if vol > 100 else vol
+        sound.volume_set(vol)
+        print(f'Громкость поставлена на {vol}')
+    else:
+        print("Число не найдено в строке.")
+
+
+def vol_off():
+    sound = Sound()
+    sound.mute()
 
 
 class Nika(QMainWindow):
@@ -197,19 +229,18 @@ class Nika(QMainWindow):
         f = True
         voice_input = record_and_recognize_audio()
         print(voice_input)
+        for i in commands_dict['commands']['vol_up']:
+            if i in voice_input:
+                vol_set(voice_input)
+                play_sound('./successful/successful', 3)
+                return
         for k, v in commands_dict['commands'].items():
             if voice_input in v:
                 f = False
-                rand = str(r.randint(0, 2))
-                file = f'./successful/successful{rand}.wav'
-                audio = AudioSegment.from_file(file, format="wav")
-                play(audio)
+                play_sound('./successful/successful', 3)
                 globals()[k]()
         if f:
-            rand = str(r.randint(0, 2))
-            file = f'./error/error{rand}.wav'
-            audio = AudioSegment.from_file(file, format="wav")
-            play(audio)
+            play_sound('./error/error', 3)
 
 
 if __name__ == "__main__":
@@ -218,4 +249,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     ex = Nika()
     ex.show()
+    sys.excepthook = except_hook
     sys.exit(app.exec_())
