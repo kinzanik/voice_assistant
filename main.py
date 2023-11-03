@@ -21,6 +21,23 @@ if not os.path.isfile(local_file):
     torch.hub.download_url_to_file('https://models.silero.ai/models/tts/ru/v4_ru.pt',
                                    local_file)
 
+config = open('config.txt', 'r', encoding='utf-8').readlines()
+
+commands_dict = {
+    'commands': {
+
+    }
+}
+
+
+for i in config:
+    if i == '!':
+        break
+    i = i.rstrip().split(': ')
+    name_func, patterns = i[0], i[1]
+    lst_patterns = patterns.split(', ')
+    commands_dict['commands'][name_func] = lst_patterns
+
 
 def except_hook(cls, exception, traceback):
     sys.__excepthook__(cls, exception, traceback)
@@ -39,32 +56,6 @@ def play_sound(path: str, klv):
         file += rand + '.wav'
     audio = AudioSegment.from_file(file, format="wav")
     play(audio)
-
-
-commands_dict = {
-    'commands': {
-        'greeting': ['привет', 'ку', 'здарова', 'добрый день'],
-        'open_youtube': ['открой ютуб', 'ютуб', 'открой youtube', 'youtube'],
-        'search_youtube': ['найди в ютуб', 'найди в youtube', 'найди в ютубе', 'найди в ютуби', 'поиск ютуб',
-                           'ютуб поиск', 'youtube поиск', 'поиск youtube'],
-        'open_google': ['открой гугл', 'гугл', 'google', 'открой google', 'включи google'],
-        'rick_roll': ['открой 4 сезон пацанов'],
-        'playlist_youtube': ['включи мой плейлист', 'плейлист ютуб', 'включи музыку'],
-        'open_vk': ['открой вк', 'открой вконтакте', 'вк'],
-        'run_dota': ['запусти доту', 'открой доту', 'открой dota', 'открой доту'],
-        'run_telegram': ['запусти телеграм', 'открой телеграм', 'открой telegram', 'запусти telegram'],
-        'run_minecraft': ['запусти minecraft', 'открой minecraft', 'включи майн', 'открой майн'],
-        'w_todo': ['напиши в список дел', 'напиши список дел', 'добавь в список дел', 'добавь список дел',
-                   'запиши в список дел', 'запиши список дел', 'пополни список дел', 'пополнить список дел',
-                   'дополни список дел'],
-        'r_todo': ['прочти список дел', 'сделай'],
-        'clear_todo': ['очисти список дел', 'очистить список дел', 'включи список дел'],
-        'vol_up': ['прибавь громкость', 'прибавь звук', 'увеличь громкость', 'прибавь громкость',
-                   'увеличить громкость', 'поставь громкость', 'уменьши громкость', 'поставь звук',
-                   'уменьшить громкость'],
-        'vol_off': ['выключи звук', 'выключить звук']
-    }
-}
 
 
 def record_and_recognize_audio(*args: tuple, do='default'):
@@ -123,7 +114,7 @@ class Speaker:
                                      sample_rate=self.sample_rate)
 
 
-'''возможности помощника'''
+'''основные возможности помощника'''
 
 
 def greeting():
@@ -134,12 +125,10 @@ def open_youtube():
     wb.open('https://www.youtube.com')
 
 
-def search_youtube():
-    search = record_and_recognize_audio(do='youtube_search')
-    search = search.split()
-    if len(search) == 0:
+def search_youtube(vi):
+    if len(vi) == 0:
         pass
-    search = '+'.join(search)
+    search = '+'.join(vi)
     url = f'https://www.youtube.com/results?search_query={search}'
     wb.open(url)
 
@@ -148,11 +137,27 @@ def open_google():
     wb.open('https://www.google.com')
 
 
+def search_google(vi):
+    if len(vi) == 0:
+        pass
+    search = '+'.join(vi)
+    url = f'https://www.google.com/search?q={search}'
+    wb.open(url)
+
+
+def search_yandex_market(vi):
+    if len(vi) == 0:
+        pass
+    search = '+'.join(vi)
+    url = f'https://market.yandex.ru/search?text={search}'
+    wb.open(url)
+
+
 def rick_roll():
     wb.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ&ab_channel=RickAstley')
 
 
-def playlist_youtube():
+def playlist():
     wb.open('https://www.youtube.com/watch?v=4W2ymUkg9Xg&list=PLmzD5x'
             'eXPBC8AHAZiTMOMhts-H2EsfAsc&ab_channel=Ren-Topic')
 
@@ -228,10 +233,32 @@ class Nika(QMainWindow):
     def listen(self):
         f = True
         voice_input = record_and_recognize_audio()
-        print(voice_input)
+        print(f'Вы сказали: {voice_input}')
         for i in commands_dict['commands']['vol_up']:
-            if i in voice_input:
+            lsti = i.split(' ')
+            if lsti == voice_input.split(' ')[:len(lsti)]:
                 vol_set(voice_input)
+                play_sound('./successful/successful', 3)
+                return
+        for i in commands_dict['commands']['search_youtube']:
+            lsti = i.split(' ')
+            if lsti == voice_input.split(' ')[:len(lsti)]:
+                seached = voice_input.split(' ')[len(lsti):]
+                search_youtube(seached)
+                play_sound('./successful/successful', 3)
+                return
+        for i in commands_dict['commands']['search_google']:
+            lsti = i.split(' ')
+            if lsti == voice_input.split(' ')[:len(lsti)]:
+                seached = voice_input.split(' ')[len(lsti):]
+                search_google(seached)
+                play_sound('./successful/successful', 3)
+                return
+        for i in commands_dict['commands']['search_yandex_market']:
+            lsti = i.split(' ')
+            if lsti == voice_input.split(' ')[:len(lsti)]:
+                seached = voice_input.split(' ')[len(lsti):]
+                search_yandex_market(seached)
                 play_sound('./successful/successful', 3)
                 return
         for k, v in commands_dict['commands'].items():
