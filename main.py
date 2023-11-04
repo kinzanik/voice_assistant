@@ -2,7 +2,7 @@ import speech_recognition
 import sys
 import random as r
 from PyQt5 import uic
-from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QAction, QPushButton
 import os
 import torch
 from pydub import AudioSegment
@@ -14,14 +14,19 @@ from sound import Sound
 import re
 
 device = torch.device('cpu')
+
 local_file = 'model.pt'
-model = torch.package.PackageImporter(local_file).load_pickle("tts_models", "model")
-model.to(device)
 if not os.path.isfile(local_file):
+    print('Производится загрузка необходимых файлов...')
     torch.hub.download_url_to_file('https://models.silero.ai/models/tts/ru/v4_ru.pt',
                                    local_file)
+model = torch.package.PackageImporter(local_file).load_pickle("tts_models", "model")
+model.to(device)
+
 
 config = open('config.txt', 'r', encoding='utf-8').readlines()
+
+all_patterns = config[0].rstrip().split(': ')[1].split(', ')
 
 commands_dict = {
     'commands': {
@@ -29,13 +34,13 @@ commands_dict = {
     }
 }
 
-
-for i in config:
+for i in config[1:]:
     if i == '!':
         break
     i = i.rstrip().split(': ')
     name_func, patterns = i[0], i[1]
     lst_patterns = patterns.split(', ')
+    all_patterns.extend(lst_patterns)
     commands_dict['commands'][name_func] = lst_patterns
 
 
@@ -223,16 +228,70 @@ def vol_off():
     sound.mute()
 
 
+class MyWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+
+        self.initUI()
+
+    def initUI(self):
+        self.setGeometry(100, 100, 400, 200)
+        self.setWindowTitle("Всплывающее меню")
+
+        # Создаем кнопку, на которую можно будет щелкнуть для открытия меню
+        button = QPushButton("Показать Меню", self)
+        button.move(50, 50)
+
+        # Создаем всплывающее меню
+        menu = QMenu(self)
+
+        # Создаем действия (пункты меню)
+        action1 = QAction("Действие 1", self)
+        action2 = QAction("Действие 2", self)
+        action3 = QAction("Действие 3", self)
+
+        # Добавляем действия в меню
+        menu.addAction(action1)
+        menu.addAction(action2)
+        menu.addSeparator()  # Разделитель
+        menu.addAction(action3)
+
+        # Связываем меню с кнопкой
+        button.setMenu(menu)
+
+
 class Nika(QMainWindow):
     def __init__(self):
         super().__init__()
         uic.loadUi('beta.ui', self)
         self.ListenBTN.clicked.connect(self.listen)
+        menu = QMenu(self)
+        act1 = QAction('Промпты', self)
+        act2 = QAction('Ссылки', self)
+        act1.triggered.connect(self.prompt)
+        menu.addAction(act1)
+        menu.addSeparator()
+        menu.addAction(act2)
+        menu.setStyleSheet("QMenu { background-color: #8388a4; }")
+        self.MenuBTN.setMenu(menu)
+
         self.speaker = Speaker()
+
+    def closeEvent(self, event):
+        print('Сохранение...')
+        conf = open('config.txt', 'w', encoding='utf-8')
+        conf.write(f'all_patterns: {", ".join(all_patterns)}\n')
+        for k, v in commands_dict['commands'].items():
+            v = ', '.join(v)
+            conf.write(f'{k}: {v}\n')
+        conf.write('!')
+        conf.close()
 
     def listen(self):
         f = True
         voice_input = record_and_recognize_audio()
+        if voice_input is None:
+            return
         print(f'Вы сказали: {voice_input}')
         for i in commands_dict['commands']['vol_up']:
             lsti = i.split(' ')
@@ -268,6 +327,12 @@ class Nika(QMainWindow):
                 globals()[k]()
         if f:
             play_sound('./error/error', 3)
+
+    def prompt(self):
+        other_window = MyWindow()
+        other_window.setParent(self)  # Устанавливаем текущее окно в качестве родителя
+        other_window.show()
+        print('dinahu')
 
 
 if __name__ == "__main__":
