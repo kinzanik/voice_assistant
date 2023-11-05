@@ -1,17 +1,18 @@
-import speech_recognition
-import sys
-import random as r
-from PyQt5 import uic
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QAction, QPushButton
 import os
+import random as r
+import re
+import subprocess as sb
+import sys
+import webbrowser as wb
+from time import sleep
+
+import speech_recognition
 import torch
+from PyQt5 import uic
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QAction, QTableWidgetItem, QWidget
 from pydub import AudioSegment
 from pydub.playback import play
-import webbrowser as wb
-import subprocess as sb
-from time import sleep
 from sound import Sound
-import re
 
 device = torch.device('cpu')
 
@@ -27,6 +28,8 @@ model.to(device)
 config = open('config.txt', 'r', encoding='utf-8').readlines()
 
 all_patterns = config[0].rstrip().split(': ')[1].split(', ')
+print(all_patterns)
+names_of_func = []
 
 commands_dict = {
     'commands': {
@@ -38,10 +41,12 @@ for i in config[1:]:
     if i == '!':
         break
     i = i.rstrip().split(': ')
-    name_func, patterns = i[0], i[1]
+    name_func, name, patterns = i[0], i[1], i[2]
     lst_patterns = patterns.split(', ')
-    all_patterns.extend(lst_patterns)
+    names_of_func.append(name)
     commands_dict['commands'][name_func] = lst_patterns
+
+not_banned = ['qwertyuiopasdfghjklzxcvbnmйцукенгшщзхъфывапролджэячсмитьбю1234567890 ']
 
 
 def except_hook(cls, exception, traceback):
@@ -94,7 +99,6 @@ def record_and_recognize_audio(*args: tuple, do='default'):
 
         except speech_recognition.UnknownValueError:
             pass
-            # TODO я хз что тут надо
 
         except speech_recognition.RequestError:
             print("Инета нет, чо делать?")
@@ -229,36 +233,102 @@ def vol_off():
     sound.mute()
 
 
-class MyWindow(QMainWindow):
+class PromptChange(QWidget):
+    def __init__(self, name_of_func, func, prompts_list):
+        self.name_of_func = name_of_func
+        self.func = func
+        self.prompts_list = prompts_list
+        self.selected_item = None
+        self.new_prompt = ''
+        super().__init__()
+        uic.loadUi('new_prompt.ui', self)
+        self.nameLabel.setText(name_of_func)
+        self.funcLabel.setText(func)
+        self.addBTN.clicked.connect(self.add)
+        self.deleteBTN.clicked.connect(self.delete)
+        for i in prompts_list:
+            self.promptsList.addItem(i)
+
+    def closeEvent(self, event):
+        pass
+
+    def add(self):
+        self.new_prompt = self.newPrompt.text().lower()
+        if self.new_prompt == '':
+            self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+            self.infoLabel.setText('Вы ничего не ввели')
+            return
+
+        if self.new_prompt in all_patterns:
+            self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+            self.infoLabel.setText('Такой промпт уже существует.')
+            return
+
+        for i in self.new_prompt:
+            if i not in not_banned[0]:
+                self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+                self.infoLabel.setText(f'Недопустимый символ: {i}')
+                return
+        self.promptsList.addItem(self.new_prompt)
+        commands_dict['commands'][self.name_of_func].append(self.new_prompt)
+        all_patterns.append(self.new_prompt)
+        self.infoLabel.setStyleSheet("color: rgb(255, 255, 255);")
+        self.infoLabel.setText('Добавлено!')
+        self.new_prompt = ''
+        self.newPrompt.setText('')
+
+        conf = open('config.txt', 'w', encoding='utf-8')
+        conf.write(f'all_patterns: {", ".join(all_patterns)}\n')
+        klv = 0
+        for k, v in commands_dict['commands'].items():
+            v = ', '.join(v)
+            conf.write(f'{k}: {names_of_func[klv]}: {v}\n')
+            klv += 1
+        conf.write('!')
+        conf.close()
+
+    def delete(self):
+        selected_item = self.promptsList.currentItem()
+        if selected_item is None:
+            self.infoLabel.setStyleSheet("color: rgb(255, 255, 255);")
+            self.infoLabel.setText('Вы не выбрали элемент')
+        else:
+            self.promptsList.takeItem(self.promptsList.row(selected_item))
+            commands_dict['commands'][self.name_of_func].remove(selected_item.text())
+            all_patterns.remove(selected_item.text())
+            self.infoLabel.setStyleSheet("color: rgb(255, 255, 255);")
+            self.infoLabel.setText('Удалено!')
+
+
+class PromptsSettings(QWidget):
     def __init__(self):
         super().__init__()
+        uic.loadUi('prompts.ui', self)
+        self.promptsTable.setRowCount(len(commands_dict['commands']))
+        self.promptsTable.setColumnCount(3)
+        self.promptsTable.setColumnWidth(1, 200)
+        self.promptsTable.setColumnWidth(2, 330)
+        self.promptsTable.setHorizontalHeaderLabels(['Имя функции', 'Задача', 'Ключевые слова (промпты)'])
 
-        self.initUI()
+        row = 0
+        for key, value in commands_dict['commands'].items():
+            key_item = QTableWidgetItem(str(key))
+            name_item = QTableWidgetItem(str(names_of_func[row]))
+            value_item = QTableWidgetItem(str(', '.join(value)))
+            self.promptsTable.setItem(row, 0, key_item)
+            self.promptsTable.setItem(row, 1, name_item)
+            self.promptsTable.setItem(row, 2, value_item)
+            row += 1
 
-    def initUI(self):
-        self.setGeometry(100, 100, 400, 200)
-        self.setWindowTitle("Всплывающее меню")
+        self.changeBTN.clicked.connect(self.change)
 
-        # Создаем кнопку, на которую можно будет щелкнуть для открытия меню
-        button = QPushButton("Показать Меню", self)
-        button.move(50, 50)
-
-        # Создаем всплывающее меню
-        menu = QMenu(self)
-
-        # Создаем действия (пункты меню)
-        action1 = QAction("Действие 1", self)
-        action2 = QAction("Действие 2", self)
-        action3 = QAction("Действие 3", self)
-
-        # Добавляем действия в меню
-        menu.addAction(action1)
-        menu.addAction(action2)
-        menu.addSeparator()  # Разделитель
-        menu.addAction(action3)
-
-        # Связываем меню с кнопкой
-        button.setMenu(menu)
+    def change(self):
+        selected = self.promptsTable.currentRow()
+        name_of_func = self.promptsTable.item(selected, 0).text()
+        func = self.promptsTable.item(selected, 1).text()
+        prompts = self.promptsTable.item(selected, 2).text().split(', ')
+        self.new_wind = PromptChange(name_of_func, func, prompts)
+        self.new_wind.show()
 
 
 class Nika(QMainWindow):
@@ -279,12 +349,14 @@ class Nika(QMainWindow):
         self.speaker = Speaker()
 
     def closeEvent(self, event):
-        print('Сохранение...')
+        print('Сохранение изменений...')
         conf = open('config.txt', 'w', encoding='utf-8')
         conf.write(f'all_patterns: {", ".join(all_patterns)}\n')
+        klv = 0
         for k, v in commands_dict['commands'].items():
             v = ', '.join(v)
-            conf.write(f'{k}: {v}\n')
+            conf.write(f'{k}: {names_of_func[klv]}: {v}\n')
+            klv += 1
         conf.write('!')
         conf.close()
 
@@ -330,10 +402,8 @@ class Nika(QMainWindow):
             play_sound('./error/error', 3)
 
     def prompt(self):
-        other_window = MyWindow()
-        other_window.setParent(self)  # Устанавливаем текущее окно в качестве родителя
-        other_window.show()
-        print('dinahu')
+        self.other_window = PromptsSettings()
+        self.other_window.show()
 
 
 if __name__ == "__main__":
