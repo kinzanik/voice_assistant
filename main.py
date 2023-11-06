@@ -28,6 +28,7 @@ config = open('config.txt', 'r', encoding='utf-8').readlines()
 
 all_patterns = config[0].rstrip().split(': ')[1].split(', ')
 names_of_func = []
+universal_dict = {}
 urls = {}
 commands_dict = {
     'commands': {
@@ -47,13 +48,24 @@ for i in config[1:]:
     names_of_func.append(name)
     commands_dict['commands'][name_func] = lst_patterns
 
+ncurs = 0 + curs
 for i in config[curs:]:
+    ncurs += 1
     i = i.rstrip()
     if i == '!':
         break
     i = i.split(': ')
     name, url = i[0], i[1]
     urls[name] = url
+
+for i in config[ncurs:]:
+    i = i.rstrip()
+    if i == '!':
+        break
+    i = i.split(': ')
+    name, overview, method, patterns = i
+    patterns = patterns.split(', ')
+    universal_dict[name] = [overview, method, patterns]
 
 
 not_banned = ['qwertyuiopasdfghjklzxcvbnmйцукенгшщзхъфывапролджэячсмитьбю1234567890 ']
@@ -75,13 +87,16 @@ def safe_config():
     conf.write('!\n')
     for k, v in urls.items():
         conf.write(f'{k}: {v}\n')
+    conf.write('!\n')
+    for k, v in universal_dict.items():
+        conf.write(f'{k}: {v[0]}: {v[1]}: {", ".join(v[2])}\n')
     conf.write('!')
     conf.close()
 
 
-def play_sound(path: str, klv):
+def play_sound(path: str, klv=0):
     file = path
-    if klv is None:
+    if klv == -1:
         file += '.wav'
         return
     klv = int(klv)
@@ -154,7 +169,14 @@ class Speaker:
 
 
 def universal_func(func, method):
-    pass
+    if method == 'url':
+        wb.open(urls[func])
+    elif method == 'path':
+        try:
+            path = urls[func]
+            sb.run([path])
+        except FileNotFoundError:
+            play_sound('./notfound_path/notfound_path0.wav')
 
 
 def greeting():
@@ -212,44 +234,61 @@ def open_vk():
 
 
 def run_dota():
-    dota_path = r"C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\bin\win64\dota2.exe"
-    sb.run([dota_path])
+    try:
+        dota_path = r"C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\bin\win64\dota2.exe"
+        sb.run([dota_path])
+    except FileNotFoundError:
+        play_sound('./notfound_path/notfound_path0.wav')
 
 
 def run_telegram():
-    telegram_path = r'C:\Users\turbo ishak\AppData\Roaming\Telegram Desktop\Telegram.exe'
-    print(telegram_path)
-    sb.run([telegram_path])
+    try:
+        telegram_path = r'C:\Users\turbo ishak\AppData\Roaming\Telegram Desktop\Telegram.exe'
+        sb.run([telegram_path])
+    except FileNotFoundError:
+        play_sound('./notfound_path/notfound_path0.wav')
 
 
 def run_minecraft():
-    minecraft_path = 'C:\XboxGames\Minecraft Launcher\Content\Minecraft.exe'
-    sb.run([minecraft_path])
+    try:
+        minecraft_path = 'C:\XboxGames\Minecraft Launcher\Content\Minecraft.exe'
+        sb.run([minecraft_path])
+    except FileNotFoundError:
+        play_sound('./notfound_path/notfound_path0.wav')
 
 
 def w_todo():
-    a = open('todo.txt', 'a', encoding='utf-8')
-    w_str = record_and_recognize_audio(do='w_todo')
-    a.write(w_str + '\n')
-    a.close()
-    print('Добавлено!')
+    try:
+        a = open('todo.txt', 'a', encoding='utf-8')
+        w_str = record_and_recognize_audio(do='w_todo')
+        a.write(w_str + '\n')
+        a.close()
+        print('Добавлено!')
+    except FileNotFoundError:
+        play_sound('./notfound_path/notfound_path0.wav')
 
 
 def r_todo():
-    a = open('todo.txt', 'r', encoding='utf-8').readlines()
-    if len(a) == 0:
-        sleep(2)
-        play_sound('./todo_list/todo_error', 3)
-        return
-    a = '. '.join(a) + '.'
-    speaker = Speaker()
-    speaker.text_to_spreach(a)
-    play_sound('test.wav', None)
+    try:
+        a = open('todo.txt', 'r', encoding='utf-8').readlines()
+        if len(a) == 0:
+            sleep(2)
+            play_sound('./todo_list/todo_error', 3)
+            return
+        a = '. '.join(a) + '.'
+        speaker = Speaker()
+        speaker.text_to_spreach(a)
+        play_sound('test.wav', -1)
+    except FileNotFoundError:
+        play_sound('./notfound_path/notfound_path0.wav')
 
 
 def clear_todo():
-    todo = open('todo.txt', 'w', encoding='utf-8')
-    todo.close()
+    try:
+        todo = open('todo.txt', 'w', encoding='utf-8')
+        todo.close()
+    except FileNotFoundError:
+        play_sound('./notfound_path/notfound_path0.wav')
 
 
 def vol_set(vi):
@@ -270,10 +309,11 @@ def vol_off():
 
 
 class PromptChange(QWidget):
-    def __init__(self, name_of_func, func, prompts_list):
+    def __init__(self, name_of_func, func, prompts_list, is_base=True):
         self.name_of_func = name_of_func
         self.func = func
         self.prompts_list = prompts_list
+        self.is_base = is_base
         self.selected_item = None
         self.new_prompt = ''
         super().__init__()
@@ -286,7 +326,7 @@ class PromptChange(QWidget):
             self.promptsList.addItem(i)
 
     def closeEvent(self, event):
-        pass
+        safe_config()
 
     def add(self):
         self.new_prompt = self.newPrompt.text().lower()
@@ -306,7 +346,10 @@ class PromptChange(QWidget):
                 self.infoLabel.setText(f'Недопустимый символ: {i}')
                 return
         self.promptsList.addItem(self.new_prompt)
-        commands_dict['commands'][self.name_of_func].append(self.new_prompt)
+        if self.is_base:
+            commands_dict['commands'][self.name_of_func].append(self.new_prompt)
+        else:
+            universal_dict[self.name_of_func][2].append(self.new_prompt)
         all_patterns.append(self.new_prompt)
         self.infoLabel.setStyleSheet("color: rgb(255, 255, 255);")
         self.infoLabel.setText('Добавлено!')
@@ -322,10 +365,14 @@ class PromptChange(QWidget):
             self.infoLabel.setText('Вы не выбрали элемент')
         else:
             self.promptsList.takeItem(self.promptsList.row(selected_item))
-            commands_dict['commands'][self.name_of_func].remove(selected_item.text())
+            if self.is_base:
+                commands_dict['commands'][self.name_of_func].remove(selected_item.text())
+            else:
+                universal_dict[self.name_of_func][2].remove(selected_item.text())
             all_patterns.remove(selected_item.text())
             self.infoLabel.setStyleSheet("color: rgb(255, 255, 255);")
             self.infoLabel.setText('Удалено!')
+            safe_config()
 
 
 class PromptsSettings(QWidget):
@@ -336,6 +383,8 @@ class PromptsSettings(QWidget):
         for i in commands_dict['commands'].keys():
             self.allPromptsList.addItem(f'{i} - {names_of_func[row]}')
             row += 1
+        for k, v in universal_dict.items():
+            self.allPromptsList.addItem(f'{k} - {v[0]}')
 
         self.changeBTN.clicked.connect(self.change)
 
@@ -344,8 +393,13 @@ class PromptsSettings(QWidget):
         lst_selected = selected_item.split(' - ')
         func_name = lst_selected[0]
         func = lst_selected[1]
-        prompts = commands_dict['commands'][func_name]
-        self.new_wind = PromptChange(func_name, func, prompts)
+        if func_name in commands_dict['commands'].keys():
+            prompts = commands_dict['commands'][func_name]
+            self.new_wind = PromptChange(func_name, func, prompts)
+
+        else:
+            prompts = universal_dict[func_name][2]
+            self.new_wind = PromptChange(func_name, func, prompts, False)
         self.new_wind.show()
 
 
@@ -380,6 +434,87 @@ class UrlsPaths(QWidget):
         safe_config()
 
 
+class AddFunction(QWidget):
+    def __init__(self):
+        super().__init__()
+        uic.loadUi('new_func.ui', self)
+        self.temp_prompts = []
+        self.new_prompt = ''
+        self.addBTN.clicked.connect(self.add)
+        self.deleteBTN.clicked.connect(self.delete)
+        self.endBTN.clicked.connect(self.safe)
+
+    def add(self):
+        self.new_prompt = self.newPrompt.text().lower()
+        if self.new_prompt == '':
+            self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+            self.infoLabel.setText('Вы ничего не ввели')
+            return
+
+        if self.new_prompt in all_patterns:
+            self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+            self.infoLabel.setText('Такой промпт уже существует.')
+            return
+
+        for i in self.new_prompt:
+            if i not in not_banned[0]:
+                self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+                self.infoLabel.setText(f'Недопустимый символ: {i}')
+                return
+        self.promptsList.addItem(self.new_prompt)
+        self.temp_prompts.append(self.new_prompt)
+        all_patterns.append(self.new_prompt)
+        self.infoLabel.setStyleSheet("color: rgb(255, 255, 255);")
+        self.infoLabel.setText('Добавлено!')
+        self.new_prompt = ''
+        self.newPrompt.setText('')
+
+    def delete(self):
+        selected_item = self.promptsList.currentItem()
+        if selected_item is None:
+            self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+            self.infoLabel.setText('Вы не выбрали элемент')
+        else:
+            self.promptsList.takeItem(self.promptsList.row(selected_item))
+            self.temp_prompts.remove(selected_item.text())
+            all_patterns.remove(selected_item.text())
+            self.infoLabel.setStyleSheet("color: rgb(255, 255, 255);")
+            self.infoLabel.setText('Удалено!')
+
+    def safe(self):
+        namelabel = self.newfuncName.text()
+        overviewlabel = self.newfunOverview.text()
+        urllabel = self.urlpathLine.text()
+        if namelabel == '':
+            self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+            self.infoLabel.setText('Название функции не введено.')
+            return
+        elif overviewlabel == '':
+            self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+            self.infoLabel.setText('Описание функции не введено.')
+            return
+        elif namelabel in commands_dict['commands'].keys() or namelabel in universal_dict.keys():
+            self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+            self.infoLabel.setText('Имя функции занятно.')
+            return
+        elif urllabel == '':
+            self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+            self.infoLabel.setText('Ссылка или путь не введены')
+            return
+        elif len(self.temp_prompts) == 0:
+            self.infoLabel.setStyleSheet("color: rgb(255, 79, 79);")
+            self.infoLabel.setText('Промпты не введены (ключевые слова)')
+            return
+
+        urls[namelabel] = urllabel
+        if self.urlBTN.isChecked():
+            universal_dict[namelabel] = [overviewlabel, 'url', self.temp_prompts]
+        else:
+            universal_dict[namelabel] = [overviewlabel, 'path', self.temp_prompts]
+        safe_config()
+        self.close()
+
+
 class Nika(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -388,11 +523,14 @@ class Nika(QMainWindow):
         menu = QMenu(self)
         act1 = QAction('Промпты', self)
         act2 = QAction('Ссылки', self)
+        act3 = QAction('Добавить функцию', self)
         act1.triggered.connect(self.prompt)
         act2.triggered.connect(self.urls_pats)
+        act3.triggered.connect(self.new_func)
         menu.addAction(act1)
-        menu.addSeparator()
         menu.addAction(act2)
+        menu.addSeparator()
+        menu.addAction(act3)
         menu.setStyleSheet("QMenu { background-color: #8388a4; }")
         self.MenuBTN.setMenu(menu)
 
@@ -434,6 +572,11 @@ class Nika(QMainWindow):
                 search_yandex_market(seached)
                 play_sound('./successful/successful', 3)
                 return
+        for k, v in universal_dict.items():
+            if voice_input in v[2]:
+                play_sound('./successful/successful', 3)
+                universal_func(k, v[1])
+                f = False
         for k, v in commands_dict['commands'].items():
             if voice_input in v:
                 f = False
@@ -448,6 +591,10 @@ class Nika(QMainWindow):
 
     def urls_pats(self):
         self.other_window = UrlsPaths()
+        self.other_window.show()
+
+    def new_func(self):
+        self.other_window = AddFunction()
         self.other_window.show()
 
 

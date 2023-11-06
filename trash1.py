@@ -19,4 +19,4 @@ class Speaker:
 
 
 speaker = Speaker()
-speaker.text_to_spreach('Ошибка! Не указаны путь или ссылка.')
+speaker.text_to_spreach('')
