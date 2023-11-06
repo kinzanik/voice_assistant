@@ -5,11 +5,10 @@ import subprocess as sb
 import sys
 import webbrowser as wb
 from time import sleep
-
 import speech_recognition
 import torch
 from PyQt5 import uic
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QAction, QWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QAction, QWidget, QTableWidgetItem
 from pydub import AudioSegment
 from pydub.playback import play
 from sound import Sound
@@ -29,27 +28,55 @@ config = open('config.txt', 'r', encoding='utf-8').readlines()
 
 all_patterns = config[0].rstrip().split(': ')[1].split(', ')
 names_of_func = []
-
+urls = {}
 commands_dict = {
     'commands': {
 
     }
 }
 
+curs = 1
 for i in config[1:]:
+    curs += 1
+    i = i.rstrip()
     if i == '!':
         break
-    i = i.rstrip().split(': ')
+    i = i.split(': ')
     name_func, name, patterns = i[0], i[1], i[2]
     lst_patterns = patterns.split(', ')
     names_of_func.append(name)
     commands_dict['commands'][name_func] = lst_patterns
+
+for i in config[curs:]:
+    i = i.rstrip()
+    if i == '!':
+        break
+    i = i.split(': ')
+    name, url = i[0], i[1]
+    urls[name] = url
+
 
 not_banned = ['qwertyuiopasdfghjklzxcvbnmйцукенгшщзхъфывапролджэячсмитьбю1234567890 ']
 
 
 def except_hook(cls, exception, traceback):
     sys.__excepthook__(cls, exception, traceback)
+
+
+def safe_config():
+    print('Сохранение изменений...')
+    conf = open('config.txt', 'w', encoding='utf-8')
+    conf.write(f'all_patterns: {", ".join(all_patterns)}\n')
+    klv = 0
+    for k, v in commands_dict['commands'].items():
+        v = ', '.join(v)
+        conf.write(f'{k}: {names_of_func[klv]}: {v}\n')
+        klv += 1
+    conf.write('!\n')
+    for k, v in urls.items():
+        conf.write(f'{k}: {v}\n')
+    conf.write('!')
+    conf.close()
 
 
 def play_sound(path: str, klv):
@@ -126,44 +153,53 @@ class Speaker:
 '''основные возможности помощника'''
 
 
+def universal_func(func, method):
+    pass
+
+
 def greeting():
     play_sound('./greeting/greeting', 4)
 
 
 def open_youtube():
-    wb.open('https://www.youtube.com')
+    wb.open(urls['youtube'])
 
 
 def search_youtube(vi):
     if len(vi) == 0:
         pass
     search = '+'.join(vi)
-    url = f'https://www.youtube.com/results?search_query={search}'
-    wb.open(url)
+    search_url = f'https://www.youtube.com/results?search_query={search}'
+    wb.open(search_url)
 
 
 def open_google():
-    wb.open('https://www.google.com')
+    wb.open(urls['google'])
 
 
 def search_google(vi):
     if len(vi) == 0:
         pass
     search = '+'.join(vi)
-    url = f'https://www.google.com/search?q={search}'
-    wb.open(url)
+    search_url = f'https://www.google.com/search?q={search}'
+    wb.open(search_url)
+
+
+def open_yandex_market():
+    search_url = 'https://market.yandex.ru/'
+    wb.open(search_url)
 
 
 def search_yandex_market(vi):
     if len(vi) == 0:
         play_sound('./search_error/search_error', 3)
     search = '+'.join(vi)
-    url = f'https://market.yandex.ru/search?text={search}'
-    wb.open(url)
+    search_url = f'https://market.yandex.ru/search?text={search}'
+    wb.open(search_url)
 
 
-def rick_roll():
-    wb.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ&ab_channel=RickAstley')
+def joke():
+    wb.open(urls['шуточное видео'])
 
 
 def playlist():
@@ -176,12 +212,13 @@ def open_vk():
 
 
 def run_dota():
-    dota_path = "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\\bin\win64\dota2.exe"
+    dota_path = r"C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\bin\win64\dota2.exe"
     sb.run([dota_path])
 
 
 def run_telegram():
-    telegram_path = 'C:\\Users\\turbo ishak\AppData\Roaming\Telegram Desktop\Telegram.exe'
+    telegram_path = r'C:\Users\turbo ishak\AppData\Roaming\Telegram Desktop\Telegram.exe'
+    print(telegram_path)
     sb.run([telegram_path])
 
 
@@ -276,15 +313,7 @@ class PromptChange(QWidget):
         self.new_prompt = ''
         self.newPrompt.setText('')
 
-        conf = open('config.txt', 'w', encoding='utf-8')
-        conf.write(f'all_patterns: {", ".join(all_patterns)}\n')
-        klv = 0
-        for k, v in commands_dict['commands'].items():
-            v = ', '.join(v)
-            conf.write(f'{k}: {names_of_func[klv]}: {v}\n')
-            klv += 1
-        conf.write('!')
-        conf.close()
+        safe_config()
 
     def delete(self):
         selected_item = self.promptsList.currentItem()
@@ -320,6 +349,37 @@ class PromptsSettings(QWidget):
         self.new_wind.show()
 
 
+class UrlsPaths(QWidget):
+    def __init__(self):
+        super().__init__()
+        uic.loadUi('urls_paths.ui', self)
+        self.urlpathTable.setRowCount(len(urls.keys()))
+        self.urlpathTable.setColumnCount(2)
+        self.urlpathTable.setColumnWidth(0, 150)
+        self.urlpathTable.setColumnWidth(1, 316)
+        self.urlpathTable.setHorizontalHeaderLabels(['Название', 'Ссылка/путь'])
+
+        row = 0
+        for key, value in urls.items():
+            key_item = QTableWidgetItem(str(key))
+            url_item = QTableWidgetItem(str(value))
+            self.urlpathTable.setItem(row, 0, key_item)
+            self.urlpathTable.setItem(row, 1, url_item)
+            row += 1
+
+        self.safeBTN.clicked.connect(self.safe)
+
+    def safe(self):
+        for row in range(len(urls.keys())):
+            key = self.urlpathTable.item(row, 0).text()
+            value = self.urlpathTable.item(row, 1).text()
+            if value == '':
+                value = 'None'
+            urls[key] = value
+        self.infoLabel.setText('Успешно!')
+        safe_config()
+
+
 class Nika(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -329,6 +389,7 @@ class Nika(QMainWindow):
         act1 = QAction('Промпты', self)
         act2 = QAction('Ссылки', self)
         act1.triggered.connect(self.prompt)
+        act2.triggered.connect(self.urls_pats)
         menu.addAction(act1)
         menu.addSeparator()
         menu.addAction(act2)
@@ -338,16 +399,7 @@ class Nika(QMainWindow):
         self.speaker = Speaker()
 
     def closeEvent(self, event):
-        print('Сохранение изменений...')
-        conf = open('config.txt', 'w', encoding='utf-8')
-        conf.write(f'all_patterns: {", ".join(all_patterns)}\n')
-        klv = 0
-        for k, v in commands_dict['commands'].items():
-            v = ', '.join(v)
-            conf.write(f'{k}: {names_of_func[klv]}: {v}\n')
-            klv += 1
-        conf.write('!')
-        conf.close()
+        safe_config()
 
     def listen(self):
         f = True
@@ -392,6 +444,10 @@ class Nika(QMainWindow):
 
     def prompt(self):
         self.other_window = PromptsSettings()
+        self.other_window.show()
+
+    def urls_pats(self):
+        self.other_window = UrlsPaths()
         self.other_window.show()
 
 
