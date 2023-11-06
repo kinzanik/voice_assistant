@@ -533,7 +533,6 @@ class Nika(QMainWindow):
         menu.addAction(act3)
         menu.setStyleSheet("QMenu { background-color: #8388a4; }")
         self.MenuBTN.setMenu(menu)
-
         self.speaker = Speaker()
 
     def closeEvent(self, event):
