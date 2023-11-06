@@ -9,7 +9,7 @@ from time import sleep
 import speech_recognition
 import torch
 from PyQt5 import uic
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QAction, QTableWidgetItem, QWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QAction, QWidget
 from pydub import AudioSegment
 from pydub.playback import play
 from sound import Sound
@@ -28,7 +28,6 @@ model.to(device)
 config = open('config.txt', 'r', encoding='utf-8').readlines()
 
 all_patterns = config[0].rstrip().split(': ')[1].split(', ')
-print(all_patterns)
 names_of_func = []
 
 commands_dict = {
@@ -304,30 +303,20 @@ class PromptsSettings(QWidget):
     def __init__(self):
         super().__init__()
         uic.loadUi('prompts.ui', self)
-        self.promptsTable.setRowCount(len(commands_dict['commands']))
-        self.promptsTable.setColumnCount(3)
-        self.promptsTable.setColumnWidth(1, 200)
-        self.promptsTable.setColumnWidth(2, 330)
-        self.promptsTable.setHorizontalHeaderLabels(['Имя функции', 'Задача', 'Ключевые слова (промпты)'])
-
         row = 0
-        for key, value in commands_dict['commands'].items():
-            key_item = QTableWidgetItem(str(key))
-            name_item = QTableWidgetItem(str(names_of_func[row]))
-            value_item = QTableWidgetItem(str(', '.join(value)))
-            self.promptsTable.setItem(row, 0, key_item)
-            self.promptsTable.setItem(row, 1, name_item)
-            self.promptsTable.setItem(row, 2, value_item)
+        for i in commands_dict['commands'].keys():
+            self.allPromptsList.addItem(f'{i} - {names_of_func[row]}')
             row += 1
 
         self.changeBTN.clicked.connect(self.change)
 
     def change(self):
-        selected = self.promptsTable.currentRow()
-        name_of_func = self.promptsTable.item(selected, 0).text()
-        func = self.promptsTable.item(selected, 1).text()
-        prompts = self.promptsTable.item(selected, 2).text().split(', ')
-        self.new_wind = PromptChange(name_of_func, func, prompts)
+        selected_item = self.allPromptsList.currentItem().text()
+        lst_selected = selected_item.split(' - ')
+        func_name = lst_selected[0]
+        func = lst_selected[1]
+        prompts = commands_dict['commands'][func_name]
+        self.new_wind = PromptChange(func_name, func, prompts)
         self.new_wind.show()
 
 
