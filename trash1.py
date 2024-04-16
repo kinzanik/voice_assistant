@@ -19,4 +19,4 @@ class Speaker:
 
 
 speaker = Speaker()
-speaker.text_to_spreach('')
+speaker.text_to_spreach('Алексей тупое чмо и инфантильный пидорас.')

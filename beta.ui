@@ -42,7 +42,7 @@ border-radius: 20px;</string>
     </property>
     <property name="icon">
      <iconset>
-      <normaloff>../../Downloads/—Pngtree—microphone glyph icon vector_5199507.png</normaloff>../../Downloads/—Pngtree—microphone glyph icon vector_5199507.png</iconset>
+      <normaloff>../end-voice-assistant/micro.png</normaloff>../end-voice-assistant/micro.png</iconset>
     </property>
     <property name="iconSize">
      <size>
@@ -90,7 +90,7 @@ padding: 0px;</string>
     </property>
     <property name="icon">
      <iconset>
-      <normaloff>../../Downloads/pngwing.com.png</normaloff>../../Downloads/pngwing.com.png</iconset>
+      <normaloff>../end-voice-assistant/menu.png</normaloff>../end-voice-assistant/menu.png</iconset>
     </property>
     <property name="iconSize">
      <size>

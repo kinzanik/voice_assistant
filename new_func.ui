@@ -246,7 +246,7 @@ padding: 0px;</string>
     <string/>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>10</x>
@@ -275,7 +275,7 @@ padding: 0px;</string>
        <string notr="true">color: rgb(255, 255, 255);</string>
       </property>
       <property name="text">
-       <string>Программа</string>
+       <string>Программа или файл</string>
       </property>
       <property name="checked">
        <bool>false</bool>

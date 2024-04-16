@@ -96,11 +96,10 @@ def safe_config():
 
 def play_sound(path: str, klv=0):
     file = path
+    klv = int(klv)
     if klv == -1:
         file += '.wav'
-        return
-    klv = int(klv)
-    if klv == 0:
+    elif klv == 0:
         file += '0' + '.wav'
     else:
         rand = str(r.randint(0, klv - 1))
@@ -181,6 +180,10 @@ def universal_func(func, method):
 
 def greeting():
     play_sound('./greeting/greeting', 4)
+
+
+def alex():
+    play_sound('./about/test', -1)
 
 
 def open_youtube():
@@ -579,7 +582,7 @@ class Nika(QMainWindow):
         for k, v in commands_dict['commands'].items():
             if voice_input in v:
                 f = False
-                play_sound('./successful/successful', 3)
+                # play_sound('./successful/successful', 3)
                 globals()[k]()
         if f:
             play_sound('./error/error', 3)
