@@ -1,17 +1,19 @@
 import os
 import random as r
 import re
+import sqlite3
 import subprocess as sb
 import sys
 import webbrowser as wb
-from time import sleep
 import speech_recognition
 import torch
+from time import sleep
 from PyQt5 import uic
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QAction, QWidget, QTableWidgetItem
 from pydub import AudioSegment
 from pydub.playback import play
 from sound import Sound
+
 
 device = torch.device('cpu')
 
@@ -24,10 +26,6 @@ model = torch.package.PackageImporter(local_file).load_pickle("tts_models", "mod
 model.to(device)
 
 
-config = open('config.txt', 'r', encoding='utf-8').readlines()
-
-all_patterns = config[0].rstrip().split(': ')[1].split(', ')
-names_of_func = []
 universal_dict = {}
 urls = {}
 commands_dict = {
@@ -36,37 +34,22 @@ commands_dict = {
     }
 }
 
-curs = 1
-for i in config[1:]:
-    curs += 1
-    i = i.rstrip()
-    if i == '!':
-        break
-    i = i.split(': ')
-    name_func, name, patterns = i[0], i[1], i[2]
-    lst_patterns = patterns.split(', ')
-    names_of_func.append(name)
-    commands_dict['commands'][name_func] = lst_patterns
-
-ncurs = 0 + curs
-for i in config[curs:]:
-    ncurs += 1
-    i = i.rstrip()
-    if i == '!':
-        break
-    i = i.split(': ')
-    name, url = i[0], i[1]
-    urls[name] = url
-
-for i in config[ncurs:]:
-    i = i.rstrip()
-    if i == '!':
-        break
-    i = i.split(': ')
-    name, overview, method, patterns = i
-    patterns = patterns.split(', ')
-    universal_dict[name] = [overview, method, patterns]
-
+db = sqlite3.connect('config.sqlite')
+cursor = db.cursor()
+cursor.execute('SELECT name FROM all_patterns')
+all_patterns = [i[0] for i in cursor.fetchall()]
+cursor.execute('SELECT name FROM names_of_func')
+names_of_func = [i[0] for i in cursor.fetchall()]
+cursor.execute('SELECT name, description, type, commands FROM universal_dict')
+for i in cursor.fetchall():
+    universal_dict[i[0]] = [i[1], i[2], i[3].split(';')]
+cursor.execute('SELECT * FROM urls')
+for i in cursor.fetchall():
+    urls[i[0]] = i[1]
+cursor.execute('SELECT * FROM commands_dict')
+for i in cursor.fetchall():
+    commands_dict['commands'][i[0]] = i[1].split(';')
+db.close()
 
 not_banned = ['qwertyuiopasdfghjklzxcvbnmйцукенгшщзхъфывапролджэячсмитьбю1234567890 ']
 
@@ -75,27 +58,8 @@ def except_hook(cls, exception, traceback):
     sys.__excepthook__(cls, exception, traceback)
 
 
-def safe_config():
-    print('Сохранение изменений...')
-    conf = open('config.txt', 'w', encoding='utf-8')
-    conf.write(f'all_patterns: {", ".join(all_patterns)}\n')
-    klv = 0
-    for k, v in commands_dict['commands'].items():
-        v = ', '.join(v)
-        conf.write(f'{k}: {names_of_func[klv]}: {v}\n')
-        klv += 1
-    conf.write('!\n')
-    for k, v in urls.items():
-        conf.write(f'{k}: {v}\n')
-    conf.write('!\n')
-    for k, v in universal_dict.items():
-        conf.write(f'{k}: {v[0]}: {v[1]}: {", ".join(v[2])}\n')
-    conf.write('!')
-    conf.close()
-
-
 def play_sound(path: str, klv=0):
-    file = path
+    file = './sounds' + path[1:]
     klv = int(klv)
     if klv == -1:
         file += '.wav'
@@ -182,10 +146,6 @@ def greeting():
     play_sound('./greeting/greeting', 4)
 
 
-def alex():
-    play_sound('./about/test', -1)
-
-
 def open_youtube():
     wb.open(urls['youtube'])
 
@@ -268,7 +228,7 @@ def w_todo():
         a.close()
         print('Добавлено!')
     except FileNotFoundError:
-        play_sound('./notfound_path/notfound_path0.wav')
+        play_sound('./notfound_path/notfound_path0  .wav')
 
 
 def r_todo():
@@ -320,16 +280,13 @@ class PromptChange(QWidget):
         self.selected_item = None
         self.new_prompt = ''
         super().__init__()
-        uic.loadUi('new_prompt.ui', self)
+        uic.loadUi('./ui/new_prompt.ui', self)
         self.nameLabel.setText(name_of_func)
         self.funcLabel.setText(func)
         self.addBTN.clicked.connect(self.add)
         self.deleteBTN.clicked.connect(self.delete)
         for i in prompts_list:
             self.promptsList.addItem(i)
-
-    def closeEvent(self, event):
-        safe_config()
 
     def add(self):
         self.new_prompt = self.newPrompt.text().lower()
@@ -349,17 +306,23 @@ class PromptChange(QWidget):
                 self.infoLabel.setText(f'Недопустимый символ: {i}')
                 return
         self.promptsList.addItem(self.new_prompt)
+        db = sqlite3.connect('config.sqlite')
+        cursor = db.cursor()
         if self.is_base:
             commands_dict['commands'][self.name_of_func].append(self.new_prompt)
+            cursor.execute(f'UPDATE commands_dict SET commands = ? WHERE name = ?',
+                           (";".join(commands_dict["commands"][self.name_of_func]), self.name_of_func))
         else:
             universal_dict[self.name_of_func][2].append(self.new_prompt)
+            cursor.execute(f'UPDATE universal_dict SET commands = ? WHERE name = ?',
+                           (";".join(universal_dict[self.name_of_func][2]), self.name_of_func,))
         all_patterns.append(self.new_prompt)
+        cursor.execute(f'INSERT INTO all_patterns (name) VALUE (?)', (self.new_prompt,))
+        db.close()
         self.infoLabel.setStyleSheet("color: rgb(255, 255, 255);")
         self.infoLabel.setText('Добавлено!')
         self.new_prompt = ''
         self.newPrompt.setText('')
-
-        safe_config()
 
     def delete(self):
         selected_item = self.promptsList.currentItem()
@@ -370,18 +333,21 @@ class PromptChange(QWidget):
             self.promptsList.takeItem(self.promptsList.row(selected_item))
             if self.is_base:
                 commands_dict['commands'][self.name_of_func].remove(selected_item.text())
+                cursor.execute('UPDATE commands_dict SET commands = ? WHERE name = ?',
+                               (";".join(commands_dict["commands"][self.name_of_func]), self.name_of_func))
             else:
                 universal_dict[self.name_of_func][2].remove(selected_item.text())
+                cursor.execute(f'UPDATE universal_dict SET commands = ? WHERE name = ?',
+                               (";".join(universal_dict[self.name_of_func][2]), self.name_of_func))
             all_patterns.remove(selected_item.text())
             self.infoLabel.setStyleSheet("color: rgb(255, 255, 255);")
             self.infoLabel.setText('Удалено!')
-            safe_config()
 
 
 class PromptsSettings(QWidget):
     def __init__(self):
         super().__init__()
-        uic.loadUi('prompts.ui', self)
+        uic.loadUi('./ui/prompts.ui', self)
         row = 0
         for i in commands_dict['commands'].keys():
             self.allPromptsList.addItem(f'{i} - {names_of_func[row]}')
@@ -409,7 +375,7 @@ class PromptsSettings(QWidget):
 class UrlsPaths(QWidget):
     def __init__(self):
         super().__init__()
-        uic.loadUi('urls_paths.ui', self)
+        uic.loadUi('./ui/urls_paths.ui', self)
         self.urlpathTable.setRowCount(len(urls.keys()))
         self.urlpathTable.setColumnCount(2)
         self.urlpathTable.setColumnWidth(0, 150)
@@ -427,20 +393,24 @@ class UrlsPaths(QWidget):
         self.safeBTN.clicked.connect(self.safe)
 
     def safe(self):
+        db = sqlite3.connect('config.sqlite')
+        cursor = db.cursor()
         for row in range(len(urls.keys())):
             key = self.urlpathTable.item(row, 0).text()
             value = self.urlpathTable.item(row, 1).text()
             if value == '':
                 value = 'None'
             urls[key] = value
+            cursor.execute(f'UPDATE urls SET url = ? WHERE name = ?', (value, key))
+        db.commit()
+        db.close()
         self.infoLabel.setText('Успешно!')
-        safe_config()
 
 
 class AddFunction(QWidget):
     def __init__(self):
         super().__init__()
-        uic.loadUi('new_func.ui', self)
+        uic.loadUi('./ui/new_func.ui', self)
         self.temp_prompts = []
         self.new_prompt = ''
         self.addBTN.clicked.connect(self.add)
@@ -510,18 +480,25 @@ class AddFunction(QWidget):
             return
 
         urls[namelabel] = urllabel
+        urls[namelabel] = urllabel
+        db = sqlite3.connect('config.sqlite')
+        cursor = db.cursor()
         if self.urlBTN.isChecked():
             universal_dict[namelabel] = [overviewlabel, 'url', self.temp_prompts]
         else:
             universal_dict[namelabel] = [overviewlabel, 'path', self.temp_prompts]
-        safe_config()
+        cursor.execute(f'INSERT INTO universal_dict (name, description, type, commands) VALUES (?, ?, ?, ?)',
+                       (namelabel, universal_dict[namelabel][0],
+                        universal_dict[namelabel][1], ';'.join(universal_dict[namelabel][2])))
+        db.commit()
+        db.close()
         self.close()
 
 
 class Nika(QMainWindow):
     def __init__(self):
         super().__init__()
-        uic.loadUi('beta.ui', self)
+        uic.loadUi('./ui/beta.ui', self)
         self.ListenBTN.clicked.connect(self.listen)
         menu = QMenu(self)
         act1 = QAction('Промпты', self)
@@ -537,9 +514,6 @@ class Nika(QMainWindow):
         menu.setStyleSheet("QMenu { background-color: #8388a4; }")
         self.MenuBTN.setMenu(menu)
         self.speaker = Speaker()
-
-    def closeEvent(self, event):
-        safe_config()
 
     def listen(self):
         f = True
